@@ -99,7 +99,7 @@ class GTFS:
         Trips
         See documentation for descriptions. Writes the zip to a folder in the current directory.
         """
-        rmtree(self.GTFS_PATH)
+        #rmtree(self.GTFS_PATH)
         r = requests.get(self.source_url)
         z = zipfile.ZipFile(io.BytesIO(r.content))
         z.extractall(self.GTFS_PATH)
@@ -119,7 +119,10 @@ class GTFS:
         and taking departure time when stop_sequence = max(stop_sequence) when grouped by trip. 
         These values are added to the trips dataset and presupposes _add_descending_stop_sequence_rank has been called.
         """
-        max_stop_sequences = self.stop_times[self.stop_times.stop_sequence_rank == 1][["trip_id", "departure_time", "stop_id"]]
+        max_stop_sequences = self.stop_times[self.stop_times.stop_sequence_rank == 1][["trip_id",
+                                                                                       "departure_time",
+                                                                                       "stop_id",
+                                                                                       "shape_dist_traveled"]]
         min_stop_sequences = self.stop_times[self.stop_times.stop_sequence == 1][["trip_id", "arrival_time"]]
         self.trips = self.trips.merge(max_stop_sequences, on="trip_id").merge(min_stop_sequences, on="trip_id")
         self.trips = self.trips.rename({"departure_time": "final_departure_time",
@@ -148,8 +151,6 @@ class GTFS:
         return trips_df
 
 
-assert gtfs.get_current_source_url() == "https://storage.googleapis.com/storage/v1/b/mdb-latest/o/us-new-jersey-new-jersey-transit-nj-transit-gtfs-508.zip?alt=media"
-
-
 if __name__ == "__main__":
-    GTFS()
+    gtsf = GTFS()
+    assert gtfs.get_current_source_url() == "https://storage.googleapis.com/storage/v1/b/mdb-latest/o/us-new-jersey-new-jersey-transit-nj-transit-gtfs-508.zip?alt=media"
