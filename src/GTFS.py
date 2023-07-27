@@ -1,6 +1,6 @@
 import pandas as pd
 import re, requests, zipfile, io
-from datetime import timedelta
+from datetime import timedelta, date
 from bisect import bisect
 from collections import defaultdict
 from shutil import rmtree
@@ -35,9 +35,8 @@ def add_interval_counts_wrapper(dataframe):
     """
     d = defaultdict(int)
     dataframe.apply(lambda x: add_interval_counts(x, d), axis=1)
-    return pd.DataFrame({"interval": [str(TIME_INTERVALS[key]) for key in d.keys()],
-                               "num_buses": d.values()},
-                              index=d.keys())
+    return pd.DataFrame(dict(interval=[str(TIME_INTERVALS[key]) for key in d.keys()], num_buses=d.values()),
+                        index=d.keys())
 
 
 def parse_dates(date_str):
@@ -49,9 +48,6 @@ def parse_dates(date_str):
     pattern = "([0-2]?\d|2[0-3]):([0-5]?\d):([0-5]?\d)"
     hms = [int(x) for x in re.search(pattern, date_str).groups()]
     return timedelta(hours=hms[0], minutes=hms[1], seconds=hms[2])
-
-
-assert parse_dates("24:10:10") == timedelta(days=1, seconds=610)
 
 
 class GTFS:
@@ -66,17 +62,16 @@ class GTFS:
     GTFS_CATALOGS_CSV = "https://bit.ly/catalogs-csv"
     URL_COLUMN = "urls.latest"
     SOURCES_NAME_VALUE = "Bus"
-    GTFS_PATH = "gtfs/"
 
-    def __init__(self):
+    def __init__(self, gtfs_output_path):
         self.source_url = self.get_current_source_url()
-        self.download_gtfs_data()
-        self.calendar_dates = pd.read_csv("gtfs/calendar_dates.txt", parse_dates=["date"])
-        self.routes = pd.read_csv("gtfs/routes.txt")
-        self.shapes = pd.read_csv("gtfs/shapes.txt")
-        self.stop_times = pd.read_csv("gtfs/stop_times.txt", parse_dates=TIME_COLS, date_parser=parse_dates)
-        self.stops = pd.read_csv("gtfs/stops.txt")
-        self.trips = pd.read_csv("gtfs/trips.txt")
+        self.download_gtfs_data(gtfs_output_path)
+        self.calendar_dates = pd.read_csv(gtfs_output_path + "calendar_dates.txt", parse_dates=["date"])
+        self.routes = pd.read_csv(gtfs_output_path + "routes.txt")
+        self.shapes = pd.read_csv(gtfs_output_path + "shapes.txt")
+        self.stop_times = pd.read_csv(gtfs_output_path + "stop_times.txt", parse_dates=TIME_COLS, date_parser=parse_dates)
+        self.stops = pd.read_csv(gtfs_output_path + "stops.txt")
+        self.trips = pd.read_csv(gtfs_output_path + "trips.txt")
         self._add_descending_stop_sequence_rank()
         self._add_trip_departure_arrival_times()
 
@@ -89,7 +84,7 @@ class GTFS:
         source_url = sources_csv[(sources_csv.provider == self.GTFS_PROVIDER) & (sources_csv.name == self.SOURCES_NAME_VALUE)][self.URL_COLUMN]
         return source_url.iloc[0]
 
-    def download_gtfs_data(self):
+    def download_gtfs_data(self, gtfs_output_path):
         """
         Downloads a zip file containing the following relevant datasets:
         Calendar Dates
@@ -99,10 +94,10 @@ class GTFS:
         Trips
         See documentation for descriptions. Writes the zip to a folder in the current directory.
         """
-        #rmtree(self.GTFS_PATH)
         r = requests.get(self.source_url)
         z = zipfile.ZipFile(io.BytesIO(r.content))
-        z.extractall(self.GTFS_PATH)
+        today = date.today().strftime("%Y-%m-%d")
+        z.extractall(gtfs_output_path + today)
 
     def _add_descending_stop_sequence_rank(self):
         """
@@ -152,5 +147,6 @@ class GTFS:
 
 
 if __name__ == "__main__":
-    gtsf = GTFS()
+    gtfs = GTFS("gtfs/")
     assert gtfs.get_current_source_url() == "https://storage.googleapis.com/storage/v1/b/mdb-latest/o/us-new-jersey-new-jersey-transit-nj-transit-gtfs-508.zip?alt=media"
+    assert parse_dates("24:10:10") == timedelta(days=1, seconds=610)
